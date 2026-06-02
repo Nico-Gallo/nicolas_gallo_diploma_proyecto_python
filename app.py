@@ -57,35 +57,45 @@ st.markdown("### Estadísticas por año")
 st.dataframe(df_filtrado.groupby('AÑO').size().reset_index(name='Egresos'))
 
 # Gráfico de distribución
-st.markdown("## Distribución de Egresos por Año")
+st.markdown("### Distribución de Egresos por Año")
+
+egresos_region_anio = df_filtrado[df_filtrado['REGION'].isin(['INTERIOR', 'MONTEVIDEO'])]
+egresos_agrupado = egresos_region_anio.groupby(['AÑO', 'REGION']).size().reset_index(name='Egresos')
 
 fig, ax = plt.subplots(figsize=(10, 5))
 
-# Fondo negro
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 
-df_filtrado['AÑO'].value_counts().sort_index().plot(
-    kind='bar',
-    ax=ax,
-    color='red',
-    edgecolor='white'
-)
+regiones = ['INTERIOR', 'MONTEVIDEO']
+colores = ['cyan', 'red']
+anios = sorted(egresos_agrupado['AÑO'].unique())
+x = range(len(anios))
+ancho = 0.35
 
-ax.set_title("Cantidad de Egresos por Año", fontsize=16, color='white')
+for i, (region, color) in enumerate(zip(regiones, colores)):
+    datos = egresos_agrupado[egresos_agrupado['REGION'] == region]
+    valores = [datos[datos['AÑO'] == a]['Egresos'].values[0] if a in datos['AÑO'].values else 0 for a in anios]
+    posiciones = [xi + i * ancho for xi in x]
+    ax.bar(posiciones, valores, width=ancho, label=region, color=color, edgecolor=color)
+
+ax.set_title("Egresos por Año — Interior vs Montevideo", fontsize=16, color='white')
 ax.set_xlabel("Año", fontsize=12, color='white')
 ax.set_ylabel("Cantidad de Egresos", fontsize=12, color='white')
-ax.tick_params(axis='x', rotation=0, colors='white')
+ax.set_xticks([xi + ancho / 2 for xi in x])
+ax.set_xticklabels(anios, color='white')
+ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f'{int(val):,}'))
 ax.tick_params(axis='y', colors='white')
 ax.spines['bottom'].set_color('white')
 ax.spines['left'].set_color('white')
 ax.spines['top'].set_color('white')
 ax.spines['right'].set_color('white')
+ax.legend(facecolor='black', labelcolor='white')
 
 st.pyplot(fig)
 
 # Gráfico de dispersión
-st.markdown("## Relación entre Región y Egresos por Año")
+st.markdown("### Relación entre Región y Egresos por Año")
 
 egresos_region = df_filtrado.groupby(['AÑO', 'REGION']).size().reset_index(name='Egresos')
 
@@ -118,7 +128,7 @@ ax2.set_xticklabels(['2021', '2022', '2023', '2024'], color='white')
 st.pyplot(fig2)
 
 # Mapa geográfico
-st.markdown("## Distribución Geográfica de Egresos")
+st.markdown("### Distribución Geográfica de Egresos")
 
 import plotly.express as px
 
@@ -128,36 +138,28 @@ egresos_mapa = df_filtrado.groupby('REGION').size().reset_index(name='Egresos')
 coordenadas = {
     'MONTEVIDEO': {'lat': -34.9011, 'lon': -56.1645},
     'INTERIOR':   {'lat': -32.5228, 'lon': -55.7658},
-    'EXTERIOR':   {'lat': -34.0, 'lon': -60.0},
-    'Sin datos':  {'lat': -33.0, 'lon': -57.0}
+    'EXTERIOR':   {'lat': -34.0,   'lon': -60.0},
+    'Sin datos':  {'lat': -33.0,   'lon': -57.0}
 }
 
 egresos_mapa['lat'] = egresos_mapa['REGION'].map(lambda r: coordenadas[r]['lat'])
 egresos_mapa['lon'] = egresos_mapa['REGION'].map(lambda r: coordenadas[r]['lon'])
 
-fig3 = px.scatter_geo(
+fig3 = px.scatter_mapbox(
     egresos_mapa,
     lat='lat',
     lon='lon',
     size='Egresos',
-    text='REGION',
+    color='REGION',
+    hover_name='REGION',
+    hover_data={'Egresos': True, 'lat': False, 'lon': False},
     title='Egresos por Región',
-    template='plotly_dark',
-    size_max=100
-)
-
-fig3.update_geos(
-    scope='south america',
-    showland=True,
-    landcolor='darkgreen',
-    showocean=True,
-    oceancolor='darkblue',
-    showcountries=True,
-    countrycolor='white',
+    size_max=60,
+    zoom=6,
     center={"lat": -32.5, "lon": -56.0},
-    projection_scale=6
+    mapbox_style="carto-darkmatter"
 )
 
-fig3.update_layout(height=600)
+fig3.update_layout(height=600, template='plotly_dark')
 st.plotly_chart(fig3, use_container_width=True)
 
