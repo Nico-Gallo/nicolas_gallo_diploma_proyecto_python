@@ -10,12 +10,11 @@ ruta = os.path.join(base_dir, 'data', 'processed', 'egresos_hospitalarios_limpio
 df = pd.read_csv(ruta, sep=';')
 
 # Título principal
-st.title("Análisis de Egresos Hospitalarios Uruguay")
+st.title("Egresos Hospitalarios Uruguay")
 st.markdown("Exploración interactiva de datos hospitalarios 2021-2024")
 
 # Sidebar
 st.sidebar.markdown("## Filtros")
-st.sidebar.markdown("Usá los filtros para explorar los datos")
 
 # Filtro por año con slider
 anio_min = int(df['AÑO'].min())
@@ -28,33 +27,65 @@ anio_rango = st.sidebar.slider(
     value=(anio_min, anio_max)
 )
 
-# Aplicar filtro al dataframe
+# Filtro de género
+generos = ['Todos'] + sorted(df['GENERO'].unique().tolist())
+genero_sel = st.sidebar.selectbox("Seleccioná el género", generos)
+
+# Filtro de grupo etario
+grupos = ['Todos'] + sorted(df['GRUPO ETAREO'].unique().tolist())
+grupo_sel = st.sidebar.selectbox("Seleccioná el grupo etario", grupos)
+
+# Filtro de causa externa
+causas = ['Todos'] + sorted(df['CAUSA EXTERNA'].unique().tolist())
+causa_sel = st.sidebar.selectbox("Seleccioná la causa externa", causas)
+
+# Aplicar todos los filtros
 df_filtrado = df[df['AÑO'].between(anio_rango[0], anio_rango[1])]
+
+if genero_sel != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['GENERO'] == genero_sel]
+
+if grupo_sel != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['GRUPO ETAREO'] == grupo_sel]
+
+if causa_sel != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['CAUSA EXTERNA'] == causa_sel]
 
 st.markdown(f"**Registros seleccionados: {len(df_filtrado):,}**")
 
 # Resumen descriptivo
 st.markdown("## Resumen Descriptivo")
 
-# Agrupamos por año para obtener cantidad de egresos
 egresos_por_anio = df_filtrado.groupby('AÑO').size()
+egresos_montevideo = len(df_filtrado[df_filtrado['REGION'] == 'MONTEVIDEO'])
+egresos_interior = len(df_filtrado[df_filtrado['REGION'] == 'INTERIOR'])
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.metric("Total registros", f"{len(df_filtrado):,}")
-    st.metric("Media de egresos", f"{egresos_por_anio.mean():,.0f}")
 
 with col2:
-    st.metric("Mediana de egresos", f"{egresos_por_anio.median():,.0f}")
-    st.metric("Desvío estándar", f"{egresos_por_anio.std():,.0f}")
+    st.metric("Egresos Montevideo", f"{egresos_montevideo:,}")
 
 with col3:
-    st.metric("Rango", f"{egresos_por_anio.max() - egresos_por_anio.min():,}")
-    st.metric("Mínimo de egresos", f"{egresos_por_anio.min():,}")
+    st.metric("Egresos Interior", f"{egresos_interior:,}")
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
+    st.metric("Media de egresos", f"{egresos_por_anio.mean():,.0f}")
+
+with col5:
+    st.metric("Mediana de egresos", f"{egresos_por_anio.median():,.0f}")
+
+with col6:
+    st.metric("Desvío estándar", f"{egresos_por_anio.std():,.0f}")
 
 st.markdown("### Estadísticas por año")
-st.dataframe(df_filtrado.groupby('AÑO').size().reset_index(name='Egresos'))
+tabla = df_filtrado.groupby('AÑO').size().reset_index(name='Egresos')
+tabla['Egresos'] = tabla['Egresos'].apply(lambda x: f'{x:,}')
+st.dataframe(tabla, hide_index=True)
 
 # Gráfico de distribución
 st.markdown("### Distribución de Egresos por Año")
@@ -94,38 +125,67 @@ ax.legend(facecolor='black', labelcolor='white')
 
 st.pyplot(fig)
 
-# Gráfico de dispersión
-st.markdown("### Relación entre Región y Egresos por Año")
+# Gráficos de distribución adicionales
+# Gráfico Público vs Privado
+st.markdown("### Egresos por Sector")
+egresos_sector = df_filtrado.groupby(['AÑO', 'SECTOR']).size().reset_index(name='Egresos')
 
-egresos_region = df_filtrado.groupby(['AÑO', 'REGION']).size().reset_index(name='Egresos')
+fig_sector, ax_sector = plt.subplots(figsize=(10, 5))
+fig_sector.patch.set_facecolor('black')
+ax_sector.set_facecolor('black')
 
-fig2, ax2 = plt.subplots(figsize=(10, 5))
+for sector, color in zip(['PRIVADO', 'PUBLICO'], ['orange', 'lime']):
+    datos = egresos_sector[egresos_sector['SECTOR'] == sector]
+    ax_sector.plot(datos['AÑO'], datos['Egresos'], marker='o', label=sector, color=color, linewidth=2)
 
-fig2.patch.set_facecolor('black')
-ax2.set_facecolor('black')
+ax_sector.set_title("Público vs Privado", fontsize=13, color='white')
+ax_sector.set_xlabel("Año", fontsize=10, color='white')
+ax_sector.set_ylabel("Egresos", fontsize=10, color='white')
+ax_sector.set_xticks([2021, 2022, 2023, 2024])
+ax_sector.set_xticklabels(['2021', '2022', '2023', '2024'], color='white')
+ax_sector.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f'{int(val):,}'))
+ax_sector.tick_params(axis='y', colors='white')
+ax_sector.spines['bottom'].set_color('white')
+ax_sector.spines['left'].set_color('white')
+ax_sector.spines['top'].set_color('white')
+ax_sector.spines['right'].set_color('white')
+ax_sector.legend(facecolor='black', labelcolor='white')
+st.pyplot(fig_sector)
 
-regiones = egresos_region['REGION'].unique()
-colores = ['red', 'cyan', 'yellow', 'lime']
+# Gráfico de Dispersión
+st.markdown("## Relación Egresos Montevideo vs Interior por Grupo Etario")
 
-for region, color in zip(regiones, colores):
-    datos = egresos_region[egresos_region['REGION'] == region]
-    ax2.scatter(datos['AÑO'], datos['Egresos'], label=region, color=color, s=100)
+egresos_mv = df_filtrado[df_filtrado['REGION'] == 'MONTEVIDEO'].groupby(['AÑO', 'GRUPO ETAREO']).size().reset_index(name='Egresos_MV')
+egresos_int = df_filtrado[df_filtrado['REGION'] == 'INTERIOR'].groupby(['AÑO', 'GRUPO ETAREO']).size().reset_index(name='Egresos_INT')
 
-ax2.set_title("Egresos por Región y Año", fontsize=16, color='white')
-ax2.set_xlabel("Año", fontsize=12, color='white')
-ax2.set_ylabel("Cantidad de Egresos", fontsize=12, color='white')
-ax2.tick_params(axis='x', colors='white')
-ax2.tick_params(axis='y', colors='white')
-ax2.spines['bottom'].set_color('white')
-ax2.spines['left'].set_color('white')
-ax2.spines['top'].set_color('white')
-ax2.spines['right'].set_color('white')
-ax2.legend(facecolor='black', labelcolor='white')
+df_cruce = pd.merge(egresos_mv, egresos_int, on=['AÑO', 'GRUPO ETAREO'])
 
-ax2.set_xticks([2021, 2022, 2023, 2024])
-ax2.set_xticklabels(['2021', '2022', '2023', '2024'], color='white')
+fig_scatter, ax_scatter = plt.subplots(figsize=(10, 6))
+fig_scatter.patch.set_facecolor('black')
+ax_scatter.set_facecolor('black')
 
-st.pyplot(fig2)
+grupos = df_cruce['GRUPO ETAREO'].unique()
+colores_scatter = ['red', 'cyan', 'yellow', 'lime', 'orange', 'hotpink', 'dodgerblue', 'white', 'violet', 'gold']
+
+for grupo, color in zip(grupos, colores_scatter):
+    datos = df_cruce[df_cruce['GRUPO ETAREO'] == grupo]
+    ax_scatter.scatter(datos['Egresos_MV'], datos['Egresos_INT'], label=grupo, color=color, s=120)
+
+ax_scatter.set_title("Egresos Montevideo vs Interior por Grupo Etario", fontsize=13, color='white')
+ax_scatter.set_xlabel("Egresos Montevideo", fontsize=10, color='white')
+ax_scatter.set_ylabel("Egresos Interior", fontsize=10, color='white')
+ax_scatter.xaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f'{int(val):,}'))
+ax_scatter.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f'{int(val):,}'))
+ax_scatter.tick_params(axis='x', colors='white')
+ax_scatter.tick_params(axis='y', colors='white')
+ax_scatter.spines['bottom'].set_color('white')
+ax_scatter.spines['left'].set_color('white')
+ax_scatter.spines['top'].set_color('white')
+ax_scatter.spines['right'].set_color('white')
+ax_scatter.legend(facecolor='black', labelcolor='white', fontsize=8)
+
+plt.tight_layout()
+st.pyplot(fig_scatter)
 
 # Mapa geográfico
 st.markdown("### Distribución Geográfica de Egresos")
