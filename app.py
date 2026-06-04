@@ -125,10 +125,9 @@ ax.legend(facecolor='black', labelcolor='white')
 
 st.pyplot(fig)
 
-# Gráficos de distribución adicionales
 # Gráfico Público vs Privado
 st.markdown("### Egresos por Sector")
-egresos_sector = df_filtrado.groupby(['AÑO', 'SECTOR']).size().reset_index(name='Egresos')
+egresos_sector = df.groupby(['AÑO', 'SECTOR']).size().reset_index(name='Egresos')
 
 fig_sector, ax_sector = plt.subplots(figsize=(10, 5))
 fig_sector.patch.set_facecolor('black')
