@@ -126,6 +126,7 @@ ax.legend(facecolor='black', labelcolor='white')
 st.pyplot(fig)
 
 # Gráfico Público vs Privado
+
 st.markdown("### Egresos por Sector")
 egresos_sector = df.groupby(['AÑO', 'SECTOR']).size().reset_index(name='Egresos')
 
